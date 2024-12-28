@@ -1,8 +1,11 @@
-import { readFile, writeFile } from 'fs/promises'
+import { readFile, writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
+import { run } from "@mermaid-js/mermaid-cli"
 
 const { MEMPOOL_SPACE_BASE_URL } = process.env
 const MP_CACHE = {}
+
+const mmdConfig = { backgroundColor: 'transparent', htmlLabels: false, puppeteerConfig: { headless: 'new' } }
 
 const getMempoolUrl = path => `${MEMPOOL_SPACE_BASE_URL || 'https://mempool.space'}/${path}`
 
@@ -45,9 +48,9 @@ const toMermaid = (data, parent) => {
     (data.Address ? `<br/>to ${truncateCenter(data.Address)}` : '') +
     (data.Label ? `<br/><br/>🏷 ${data.Label}` : '')
   mermaid += `
-      ${from} --- ${txId}("${truncateCenter(data.Txid)}:${data.Vout}<br><br>${comment}"):::tx
-      ${txId} -- "<strong>${data.Confirmed}</strong><br>${data.Date}" --> ${dest}
-      click ${txId} href "${getMempoolUrl(`tx/${data.Txid}`)}" _blank`
+    ${from} --- ${txId}("${truncateCenter(data.Txid)}:${data.Vout}<br><br>${comment}"):::tx
+    ${txId} -- "<strong>${data.Confirmed}</strong><br>${data.Date}" --> ${dest}
+    click ${txId} href "${getMempoolUrl(`tx/${data.Txid}`)}" _blank`
   if (data.Inputs) {
     for (const input of data.Inputs) {
       mermaid += toMermaid(input, walletId)
@@ -58,17 +61,24 @@ const toMermaid = (data, parent) => {
 
 export const writeMermaidFile = async data => {
   const title = `${data.Txid}:${data.Vout}`
-  const mermaid = `
-  ---
+  const mmd = `---
   title: "${title}"
-  ---
+  config:
+    maxTextSize: 999999999
+---
   flowchart BT
-      classDef outgoing stroke:#f00
-      classDef incoming stroke:#0f0
-      classDef wallet stroke:#00f` + toMermaid(data)
-  const template = await readFile('./template.html', 'utf8')
-  const html = template.replace('#TITLE#', title).replace('#TMPL#', mermaid)
-  await writeFile(join('generated', 'html', `${data.Txid}_${data.Vout}.html`), html)
+    classDef outgoing stroke:#f00
+    classDef incoming stroke:#0f0
+    classDef wallet stroke:#00f`  + toMermaid(data)
+  const _html = await readFile('./template.html', 'utf8')
+  const html = _html.replace('#TITLE#', title).replace('#TMPL#',mmd)
+  const name = `${data.Txid}_${data.Vout}`
+  await mkdir(join('generated', 'mmd'), { recursive: true })
+  await mkdir(join('generated', 'svg'), { recursive: true })
+  await mkdir(join('generated', 'html'), { recursive: true })
+  await writeFile(join('generated', 'mmd', `${name}.mmd`), mmd)
+  await writeFile(join('generated', 'html', `${name}.html`), html)
+  await run(join('generated', 'mmd', `${name}.mmd`), join('generated', 'svg', `${name}.svg`), mmdConfig)
 }
 
 export const satsToBtc = value => parseInt(value, 10) / 100000000

@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'fs/promises'
+import { writeFile } from 'fs/promises'
 import { join } from 'path'
 import { getMempoolSpaceData, writeMermaidFile } from './helpers.mjs'
 
@@ -31,6 +31,7 @@ const getData = async (txid, vout, index, level) => {
     console.groupEnd()
     return null
   }
+  console.log('Input from', entry.Wallet, '-', entry.Label || 'no label')
 
   const data = { ...entry, Vout: parseInt(vout), Confirmed: mempoolData.Confirmed.Blockheight, Address: mempoolData.Outputs[vout].Address }
   const inputs = []
@@ -52,10 +53,10 @@ const getData = async (txid, vout, index, level) => {
 ;(async function() {
   let index = []
   try {
-    const json = await import('./generated/index.json', { assert: { type: 'json' } })
+    const json = await import('./generated/index.json', { with: { type: 'json' } })
     index = json.default
   } catch (e) {
-    console.error('No index. Run "npm run index SPARROW_EXPORTS_PATH" first.')
+    console.error('No index. Run "npm run index SPARROW_EXPORTS_PATH" first.', e)
     process.exit(1)
   }
 
