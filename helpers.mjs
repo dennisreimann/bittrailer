@@ -28,7 +28,7 @@ export const getMempoolSpaceData = async txId => {
   if (!txData) return null
   const { vin: inputs, vout: outputs, status: { confirmed, block_height, block_time } } = txData
   return {
-    Inputs: inputs.map(i => ({ Txid: i.txid, Vout: i.vout })),
+    Inputs: inputs.map(i => ({ Txid: i.txid, Vout: i.vout, Value: i.prevout.value })),
     Outputs: outputs.map(o => ({ Address: o.scriptpubkey_address, Value: o.value })),
     Confirmed: confirmed ? { Blockheight: block_height, Date: new Date(block_time * 1000) } : false
   }
@@ -39,40 +39,36 @@ const truncateCenter = (str, len = 7) => str.length <= len * 2 ? str : `${str.sl
 
 const toMermaid = (data, parent) => {
   let mermaid = ''
-  const walletId = `W_${slug(data.Wallet)}_${data.Txid}`
-  const txId = `T_${data.Txid}`
-  const from = data.Inputs ? `${walletId}["${data.Wallet}"]:::wallet` : `in_${data.Txid}[\\"${data.Label}"/]:::incoming`
-  const dest = parent || `out_${data.Txid}[/"${data.Label}"\\]:::outgoing`
+  const txId = `T_${data.Txid}_${data.Vout}`
+  const clss = parent ? `${(data.Inputs ? 'tx' : 'txin')} --> ${parent}` : 'txout'
   const comment = `${Math.abs(data.Value)} sats` +
-    (data.Fee ? ` (${data.Fee} sats fee)` : '') +
-    (data.Address ? `<br/>to ${truncateCenter(data.Address)}` : '') +
-    (data.Label ? `<br/><br/>🏷 ${data.Label}` : '')
+    (data.Fee ? `<br>(-${data.Fee} sats fee)` : '') +
+    (data.Address ? `<br>to ${truncateCenter(data.Address)}` : '') +
+    (data.Label ? `<br><br><strong>${data.Wallet}</strong><br>${data.Inputs ? 'to: ' : 'from: '} ${data.Label} 🏷` : '')
   mermaid += `
-    ${from} --- ${txId}("${truncateCenter(data.Txid)}:${data.Vout}<br><br>${comment}"):::tx
-    ${txId} -- "<strong>${data.Confirmed}</strong><br>${data.Date}" --> ${dest}
-    click ${txId} href "${getMempoolUrl(`tx/${data.Txid}`)}" _blank`
+    ${txId}("<strong>${data.Confirmed}</strong><br>${data.Date}<br/>${truncateCenter(data.Txid)}:${data.Vout}<br><br>${comment}"):::${clss}
+    click ${txId} href "tx/${data.Txid}"`
   if (data.Inputs) {
     for (const input of data.Inputs) {
-      mermaid += toMermaid(input, walletId)
+      mermaid += toMermaid(input, txId)
     }
   }
   return mermaid
 }
 
 export const writeMermaidFile = async data => {
-  const title = `${data.Txid}:${data.Vout}`
+  const title = data.title || `${data.Txid}:${data.Vout}`
   const mmd = `---
   title: "${title}"
   config:
     maxTextSize: 999999999
 ---
   flowchart BT
-    classDef outgoing stroke:#f00
-    classDef incoming stroke:#0f0
-    classDef wallet stroke:#00f`  + toMermaid(data)
+    classDef txout stroke:#f00
+    classDef txin stroke:#0f0`  + toMermaid(data)
   const _html = await readFile('./template.html', 'utf8')
-  const html = _html.replace('#TITLE#', title).replace('#TMPL#',mmd)
-  const name = `${data.Txid}_${data.Vout}`
+  const html = _html.replace('#TITLE#', title).replace('#TMPL#',mmd).replace('#BASE#',MEMPOOL_SPACE_BASE_URL)
+  const name = title || `${data.Txid}_${data.Vout}`
   await mkdir(join('generated', 'mmd'), { recursive: true })
   await mkdir(join('generated', 'svg'), { recursive: true })
   await mkdir(join('generated', 'html'), { recursive: true })

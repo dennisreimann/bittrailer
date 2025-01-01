@@ -3,13 +3,18 @@ import { join } from 'path'
 import { getMempoolSpaceData, writeMermaidFile } from './helpers.mjs'
 
 const outpoint = process.argv[2]
+const title = process.argv[3] || outpoint
 
 const filterInputs = inputs => inputs.length > 1
   ? inputs.find(i => i.Value < 0)
   : inputs[0]
 
+const findInputs = (txs, input) =>
+  txs.find(tx => tx.Value + tx.Fee == input.Value)
+
 const getData = async (txid, vout, index, level) => {
-  console.group(`${txid}:${vout}`)
+  const group = vout ? `${txid}:${vout}` : txid
+  console.group(group)
 
   const entries = index[txid] || []
   if (!entries.length) {
@@ -19,7 +24,7 @@ const getData = async (txid, vout, index, level) => {
   }
 
   const mempoolData = await getMempoolSpaceData(txid)
-  if (!entries.length) {
+  if (!mempoolData) {
     console.warn('no mempool data')
     console.groupEnd()
     return null
@@ -31,16 +36,22 @@ const getData = async (txid, vout, index, level) => {
     console.groupEnd()
     return null
   }
-  console.log('Input from', entry.Wallet, '-', entry.Label || 'no label')
+  console.log('Input from', entry.Wallet, '-', entry.Label || 'no label', mempoolData)
 
-  const data = { ...entry, Vout: parseInt(vout), Confirmed: mempoolData.Confirmed.Blockheight, Address: mempoolData.Outputs[vout].Address }
+  const v = vout ? parseInt(vout) : 0
+  const data = { ...entry, Confirmed: mempoolData.Confirmed.Blockheight, Vout: v, Address: mempoolData.Outputs[v].Address }
+
   const inputs = []
   for (const input of mempoolData.Inputs) {
+    console.log(input)
     // check if we know about this input
-    const txInput = filterInputs(index[input.Txid] || [])
+    const txInput = findInputs(index[input.Txid] || [], input)
     // if so, get their data from the index as well
     if (!txInput) continue
     const inputData = await getData(txInput.Txid, input.Vout, index, level + 1)
+    if (!inputData) continue
+
+    inputData.Value = input.Value
     inputs.push(inputData)
   }
   if (inputs.length) {
@@ -65,7 +76,9 @@ const getData = async (txid, vout, index, level) => {
   if (!data) process.exit(1)
 
   // write result to file
-  await writeFile(join('generated', `${txId}_${vout}.json`), JSON.stringify(data, null, 2))
+  data.title = title
+  const filename = title || (vout ? `${txId}_${vout}` : txId)
+  await writeFile(join('generated', `${filename}.json`), JSON.stringify(data, null, 2))
 
   // mermaid
   await writeMermaidFile(data)

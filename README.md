@@ -13,5 +13,6 @@ Usage:
 node index.mjs SPARROW_EXPORTS_PATH
 
 # Lookup UTXO
+node lookup.mjs TXID
 node lookup.mjs TXID:VOUT
 ```

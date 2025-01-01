@@ -3,7 +3,9 @@ import { basename, extname, join } from 'path'
 import { csv2json, json2csv } from 'json-2-csv'
 import { convertToSats } from './helpers.mjs'
 
-const directoryPath = process.argv[2]
+const { SPARROW_EXPORTS_PATH } = process.env
+
+const directoryPath = process.argv[2] || SPARROW_EXPORTS_PATH
 
 async function processFile(filePath) {
   const ext = extname(filePath)
@@ -20,6 +22,13 @@ async function processFile(filePath) {
     // ensure sats as standard value
     row.Value = row.Value ? convertToSats(row.Value) : null
     row.Fee = row.Fee ? convertToSats(row.Fee) : null
+    // ensure unified date object
+    if (row['Date (UTC)']) {
+      const dt = new Date(row['Date (UTC)'] + 'Z')
+      dt.setHours(dt.getHours() + 2)
+      row.Date = dt.toISOString().substring(0,16).replace('T', ' ')
+      delete row['Date (UTC)']
+    }
     return row
   })
 }
