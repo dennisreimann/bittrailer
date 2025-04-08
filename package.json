@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@mermaid-js/mermaid-cli": "11.4.2",
-    "json-2-csv": "5.5.7",
-    "mermaid": "11.4.1",
+    "json-2-csv": "5.5.9",
+    "mermaid": "11.6.0",
     "serve": "14.2.4"
   }
 }

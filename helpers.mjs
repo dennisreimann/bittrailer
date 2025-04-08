@@ -46,18 +46,21 @@ export const truncateCenter = (str, len = 7) => str.length <= len * 2 ? str : `$
 
 const toMermaid = (data, parent) => {
   let mermaid = ''
-  const txId = `T_${data.Txid}_${data.Vout}`
+  const txId = `T_${data.Txid}`
   const clss = parent ? `${(data.Inputs ? 'tx' : 'txin')} --> ${parent}` : 'txout'
-  const comment = `${Math.abs(data.Value)} sats` +
-    (data.Fee ? `<br>(-${data.Fee} sats fee)` : '') +
-    (data.Address ? `<br>to ${truncateCenter(data.Address)}` : '') +
-    (data.Label ? `<br><br><strong>${data.Wallet}</strong><br>${data.Inputs ? 'to: ' : 'from: '} ${data.Label} 🏷` : '')
+  const fee = data.Fee ? `<br>Fee: ${data.Fee} sats` : ''
+  const label = data.Label ? ` (${data.Label})` : ''
   mermaid += `
-    ${txId}("<strong>${data.Confirmed}</strong><br>${data.Date}<br/>${truncateCenter(data.Txid)}:${data.Vout}<br><br>${comment}"):::${clss}
+
+    ${txId}("<strong>${data.Confirmed}</strong> (${data.Date})<br/>${truncateCenter(data.Txid)}<br/><br/>To: ${truncateCenter(data.Address)}${label}<br>Amount: ${Math.abs(data.Value + data.Fee)} sats${fee}"):::${clss}
     click ${txId} href "tx/${data.Txid}"`
   if (data.Inputs) {
     for (const input of data.Inputs) {
-      mermaid += toMermaid(input, txId)
+      const voutId = `T_${input.Txid}_${input.Vout}`
+      const lbl = input.Label ? ` (${input.Label})` : ''
+      mermaid += `
+    ${voutId}("<strong>${truncateCenter(input.Txid)}:${input.Vout}</strong><br>${Math.abs(input.Value)} sats<br>Wallet: ${input.Wallet}${lbl}"):::vout" --> ${txId}`
+      mermaid += toMermaid(input, voutId)
     }
   }
   return mermaid
@@ -72,16 +75,16 @@ export const writeMermaidFile = async data => {
 ---
   flowchart BT
     classDef txout stroke:#f00
-    classDef txin stroke:#0f0`  + toMermaid(data)
+    classDef txin stroke:#0f0
+    classDef tx stroke:#00f`  + toMermaid(data)
   const _html = await readFile('./template.html', 'utf8')
   const html = _html.replace('#TITLE#', title).replace('#TMPL#',mmd).replace('#BASE#',MEMPOOL_SPACE_BASE_URL)
-  const name = slug(title)
   await mkdir(join('generated', 'mmd'), { recursive: true })
   await mkdir(join('generated', 'svg'), { recursive: true })
   await mkdir(join('generated', 'html'), { recursive: true })
-  await writeFile(join('generated', 'mmd', `${name}.mmd`), mmd)
-  await writeFile(join('generated', 'html', `${name}.html`), html)
-  await run(join('generated', 'mmd', `${name}.mmd`), join('generated', 'svg', `${name}.svg`), mmdConfig)
+  await writeFile(join('generated', 'html', `${data.slug}.html`), html)
+  await writeFile(join('generated', 'mmd', `${data.filename}.mmd`), mmd)
+  await run(join('generated', 'mmd', `${data.filename}.mmd`), join('generated', 'svg', `${data.filename}.svg`), mmdConfig)
 }
 
 export const satsToBtc = value => parseInt(value, 10) / 100000000

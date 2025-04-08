@@ -4,7 +4,7 @@ import { getMempoolSpaceData, writeMermaidFile, slug } from './helpers.mjs'
 
 const outpoint = process.argv[2]
 const title = process.argv[3] || outpoint
-const lvl = process.argv[4] || 50
+const lvl = process.argv[4] || 10
 
 const filterInputs = inputs => inputs.length > 1
   ? inputs.find(i => i.Value < 0)
@@ -18,6 +18,7 @@ const findInputs = (txs, input) => {
     return val + 1 == input.Value || val - 1 == input.Value
   })
   // fallback to simple transaction lookup
+  // uncomment if lookup doesn't yield expected results
   if (!inp) inp = filterInputs(txs)
   return inp
 }
@@ -92,8 +93,9 @@ const getData = async (txid, vout, index, level) => {
 
   // write result to file
   data.title = title
-  const filename = slug(title)
-  await writeFile(join('generated', `${filename}.json`), JSON.stringify(data, null, 2))
+  data.slug = slug(title)
+  data.filename = slug(outpoint)
+  await writeFile(join('generated', `${data.filename}.json`), JSON.stringify(data, null, 2))
 
   // mermaid
   await writeMermaidFile(data)
