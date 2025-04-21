@@ -6,8 +6,8 @@
   "author": "",
   "license": "UNLICENSED",
   "scripts": {
-    "init": "npm install && mkdir -p generated/html && cp -r node_modules/mermaid/dist generated/html/mermaid",
-    "index": "node task-index.mjs",
+    "init": "npm install && mkdir -p generated/html && cp -r node_modules/mermaid/dist generated/html/mermaid && npm run index",
+    "index": "NODE_NO_WARNINGS=1 node task-index.mjs",
     "lookup": "NODE_NO_WARNINGS=1 node task-lookup.mjs",
     "mermaid": "NODE_NO_WARNINGS=1 node task-mermaid.mjs",
     "start": "serve generated/html"

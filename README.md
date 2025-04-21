@@ -12,8 +12,8 @@ Usage:
 # Set path for export directory
 export SPARROW_EXPORTS_PATH="../sparrow-labels"
 
-# Build index
-npm run index
+# Setup and build index
+npm run init
 
 # Lookup UTXO trail
 npm run lookup TXID [TITLE] [MAX_DEPTH]
