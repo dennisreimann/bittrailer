@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from 'fs/promises'
+import { readFile, writeFile, mkdir, access } from 'fs/promises'
 import { join } from 'path'
 import { run } from "@mermaid-js/mermaid-cli"
 
@@ -6,68 +6,44 @@ const { MEMPOOL_SPACE_BASE_URL } = process.env
 
 const mmdConfig = { backgroundColor: 'transparent', htmlLabels: false, puppeteerConfig: { headless: 'new' } }
 
-const getMempoolUrl = path => `${MEMPOOL_SPACE_BASE_URL || 'https://mempool.space'}/${path}`
-
-const queryMempoolSpace = async apiPath => {
-  const url = getMempoolUrl(`api/${apiPath}`)
-  try {
-    const res = await fetch(url)
-    if (res.ok) {
-      const json = await res.json()
-      await mkdir(join('cache', 'tx'), { recursive: true })
-      await writeFile(join('cache', `${apiPath}.json`), JSON.stringify(json, null, 2))
-      return json
-    }
-  } catch (e) {
-    console.error('Error querying Mempool Space at', url, e.message)
-  }
-}
-
-export const getMempoolSpaceData = async txId => {
-  const lookup = `tx/${txId}`;
-  let txData;
-  try {
-    const json = await import(`./cache/${lookup}.json`, { with: { type: 'json' } })
-    txData = json.default
-  } catch (e) {
-    txData = await queryMempoolSpace(lookup)
-  }
-  if (!txData) return null
-  const { vin: inputs, vout: outputs, status: { confirmed, block_height, block_time } } = txData
-  return {
-    Inputs: inputs.map(i => ({ Txid: i.txid, Vout: i.vout, Value: i.prevout.value })),
-    Outputs: outputs.map(o => ({ Address: o.scriptpubkey_address, Value: o.value })),
-    Confirmed: confirmed ? { Blockheight: block_height, Date: new Date(block_time * 1000) } : false
-  }
-}
-
 export const slug = str => str.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^-+|-+$/g, '')
 export const truncateCenter = (str, len = 7) => str.length <= len * 2 ? str : `${str.slice(0, len)}…${str.slice(-len)}`
+export const satsToBtc = value => parseInt(value, 10) / 100000000
+export const btcToSats = value => parseInt(value * 100000000, 10)
+export const convertToSats = value => value.toString().includes('.') ? btcToSats(parseFloat(value)) : parseInt(value, 10)
+export const fileExists = async path => { access(path).then(() => true).catch(() => false) }
+
+const dateFormat = new Intl.DateTimeFormat('de-DE', {dateStyle: 'short', timeStyle: 'short'})
 
 const toMermaid = (data, parent) => {
   let mermaid = ''
-  const txId = `T_${data.Txid}`
-  const clss = parent ? `${(data.Inputs ? 'tx' : 'txin')} --> ${parent}` : 'txout'
-  const fee = data.Fee ? `<br>Fee: ${data.Fee} sats` : ''
-  const label = data.Label ? ` (${data.Label})` : ''
+  const [txid] = data.ref.split(':')
+  const txId = `T_${slug(truncateCenter(txid))}`
+  const clss = parent ? `${(data.inputs ? 'tx' : 'txin')} --> ${parent}` : 'txout'
+  const fee = data.fee ? `<br/>Fee: <span data-s>${data.fee}</span> sats` : ''
+  const label = data.label ? `<br/>Label: <span data-s>${data.label}</span>` : ''
+  const date = dateFormat.format(new Date(data.time))
   mermaid += `
 
-    ${txId}("<strong>${data.Confirmed}</strong> (${data.Date})<br/>${truncateCenter(data.Txid)}<br/><br/>To: ${truncateCenter(data.Address)}${label}<br>Amount: ${Math.abs(data.Value + data.Fee)} sats${fee}"):::${clss}
-    click ${txId} href "tx/${data.Txid}"`
-  if (data.Inputs) {
-    for (const input of data.Inputs) {
-      const voutId = `T_${input.Txid}_${input.Vout}`
-      const lbl = input.Label ? ` (${input.Label})` : ''
+    ${txId}("<span data-s>${truncateCenter(txid)}</span><br/><strong data-s>${data.height}</strong><time data-s datetime="${data.time}">${date}</time><br/><span data-s>${Math.abs(data.value + (data.fee || 0))}</span> sats${fee}${label}"):::${clss}
+    click ${txId} href "tx/${txid}"`
+  if (data.inputs) {
+    for (const input of data.inputs) {
+      const [, iVout] = input.ref.split(':')
+      const voutId = `${txId}_${iVout}`
+      const id = `<strong data-s>${truncateCenter(txid)}:${iVout}</strong><br/><br/>`
+      const lbl = input.address.label ? `<br/>Label: <span data-s>${input.address.label}</span>` : ''
+      const childTx = input.outpoint.tx
       mermaid += `
-    ${voutId}("<strong>${truncateCenter(input.Txid)}:${input.Vout}</strong><br>${Math.abs(input.Value)} sats<br>Wallet: ${input.Wallet}${lbl}"):::vout" --> ${txId}`
-      mermaid += toMermaid(input, voutId)
+    ${voutId}(["<span data-s>${Math.abs(input.value)}</span> sats<br>Wallet: <span data-s>${input.wallet}</span>"]):::vout" --> ${txId}`
+      if (childTx) mermaid += toMermaid(childTx, voutId)
     }
   }
   return mermaid
 }
 
-export const writeMermaidFile = async data => {
-  const title = data.title || (data.Vout ? `${data.Txid}:${data.Vout}` : data.Txid)
+export const writeMermaidFile = async info => {
+  const { id, title, slug, data } = info
   const mmd = `---
   title: "${title}"
   config:
@@ -82,11 +58,7 @@ export const writeMermaidFile = async data => {
   await mkdir(join('generated', 'mmd'), { recursive: true })
   await mkdir(join('generated', 'svg'), { recursive: true })
   await mkdir(join('generated', 'html'), { recursive: true })
-  await writeFile(join('generated', 'html', `${data.slug}.html`), html)
-  await writeFile(join('generated', 'mmd', `${data.filename}.mmd`), mmd)
-  await run(join('generated', 'mmd', `${data.filename}.mmd`), join('generated', 'svg', `${data.filename}.svg`), mmdConfig)
+  await writeFile(join('generated', 'html', `${slug}.html`), html)
+  await writeFile(join('generated', 'mmd', `${id}.mmd`), mmd)
+  await run(join('generated', 'mmd', `${id}.mmd`), join('generated', 'svg', `${id}.svg`), mmdConfig)
 }
-
-export const satsToBtc = value => parseInt(value, 10) / 100000000
-export const btcToSats = value => parseInt(value * 100000000, 10)
-export const convertToSats = value => value.toString().includes('.') ? btcToSats(parseFloat(value)) : parseInt(value, 10)

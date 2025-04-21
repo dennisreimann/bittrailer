@@ -1,51 +1,56 @@
 import { readdir, readFile, writeFile } from 'fs/promises'
-import { basename, extname, join } from 'path'
-import { csv2json, json2csv } from 'json-2-csv'
-import { convertToSats } from './helpers.mjs'
+import { basename, extname, join, resolve } from 'path'
+import { fileExists, slug } from './helpers.mjs'
 
-const { SPARROW_EXPORTS_PATH } = process.env
+const indexFile = `./generated/_index.json`
 
-const directoryPath = process.argv[2] || SPARROW_EXPORTS_PATH
-
-async function processFile(filePath) {
+const processFile = async filePath => {
   const ext = extname(filePath)
-  if (ext != '.csv') return []
-  const name = basename(filePath, ext)
-  const csv = await readFile(filePath, 'utf8')
-  return csv2json(csv.trim()).map(row => {
-    // remove balance
-    delete row.Balance
-    // assign filename as wallet name
-    row.Wallet = name
-    // ensure string label
-    row.Label = row.Label ? row.Label.toString() : null
-    // ensure sats as standard value
-    row.Value = row.Value ? convertToSats(row.Value) : null
-    row.Fee = row.Fee ? convertToSats(row.Fee) : null
-    // ensure unified date object
-    if (row['Date (UTC)']) {
-      const dt = new Date(row['Date (UTC)'] + 'Z')
-      dt.setHours(dt.getHours() + 2)
-      row.Date = dt.toISOString().substring(0,16).replace('T', ' ')
-      delete row['Date (UTC)']
-    }
-    return row
-  })
+  if (ext != '.jsonl') return []
+  const name = basename(filePath, ext).replace(/-labels$/g, '')
+  const str = await readFile(filePath, 'utf8')
+  return str.split('\n').filter(j => !!j).reduce((acc, s) => {
+    const d = JSON.parse(s)
+    d.wallet = name
+    // exclude xpub entries
+    if (d.origin) acc.push(d)
+    return acc
+  }, [])
 }
 
-;(async function() {
+export const buildIndex = async directoryPath => {
   // get and process files
   const files = await readdir(directoryPath)
   const promises = files.map(file => processFile(join(directoryPath, file)))
   const allResults = await Promise.all(promises)
-  // flatten and group by txid
-  const sorted = allResults.flat().sort((a, b) => new Date(a.Date) - new Date(b.Date))
-  const data = sorted.reduce((acc, row) => {
-    if (!acc[row.Txid]) acc[row.Txid] = []
-    acc[row.Txid].push(row)
+  // flatten and index by type
+  const index = allResults.flat().reduce((acc, r) => {
+    const { type, ref, origin, keypath } = r
+    // group by type
+    acc[type] = acc[type] || {}
+    // index per type
+    if (type === 'tx') {
+      // by txid
+      acc[type][ref] = acc[type][ref] || []
+      acc[type][ref].push(r)
+    } else if (type === 'input') {
+      // by txid + vout
+      const [txid, vout] = ref.split(':')
+      acc[type][txid] = acc[type][txid] || {}
+      acc[type][txid][vout] = r
+    } else {
+      // by origin + keypath
+      acc[type][`${origin}:${keypath}`] = r
+    }
     return acc
   }, {})
-  // write index
-  await writeFile(join('generated', 'index.json'), JSON.stringify(data, null, 2))
-  await writeFile(join('generated', 'index.csv'), json2csv(data, { emptyFieldValue: '' }))
-})()
+  // write and return index
+  await writeFile(indexFile, JSON.stringify(index, null, 2))
+  return index
+}
+
+// returns cached index or builds new one
+export const getIndex = async directoryPath =>
+  await fileExists(indexFile)
+    ? (await import(indexFile, { with: { type: 'json' } })).default
+    : await buildIndex(directoryPath)
