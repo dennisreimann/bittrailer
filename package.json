@@ -13,9 +13,8 @@
     "start": "serve generated/html"
   },
   "dependencies": {
-    "@mermaid-js/mermaid-cli": "11.4.2",
-    "json-2-csv": "5.5.9",
-    "mermaid": "11.6.0",
-    "serve": "14.2.4"
+    "@mermaid-js/mermaid-cli": "11.9.0",
+    "mermaid": "11.11.0",
+    "serve": "14.2.5"
   }
 }
