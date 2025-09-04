@@ -1,6 +1,6 @@
 import { readdir, readFile, writeFile } from 'fs/promises'
-import { basename, extname, join, resolve } from 'path'
-import { fileExists, slug } from './helpers.mjs'
+import { basename, extname, join } from 'path'
+import { fileExists } from './helpers.mjs'
 
 const indexFile = `./generated/_index.json`
 

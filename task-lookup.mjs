@@ -10,7 +10,7 @@ const index = await getIndex(process.env.SPARROW_EXPORTS_PATH)
 
 const getData = async (txid, vout, level) => {
   if (level > lvl) return console.warn('max level reached')
-  // looup transaction
+  // lookup transaction
   console.group(vout ? `${txid}:${vout}` : txid)
   const txs = index.tx[txid] || []
   if (!txs.length) {
