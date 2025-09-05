@@ -25,7 +25,9 @@ const toMermaid = (data, parent) => {
   const date = dateFormat.format(new Date(data.time))
   mermaid += `
 
-    ${txId}("<span data-s>${truncateCenter(txid)}</span><br/><strong data-s>${data.height}</strong><time data-s datetime="${data.time}">${date}</time><br/><span data-s>${Math.abs(data.value + (data.fee || 0))}</span> sats${fee}${label}"):::${clss}
+    ${txId}("<span data-s>${truncateCenter(txid)}</span><br/><strong data-s>${data.height}</strong><time data-s datetime="${data.time}">${date}</time><br/><span data-s>${Math.abs(data.value + (data.fee || 0))}</span> sats${fee}${label}"):::${clss}`
+  if (MEMPOOL_SPACE_BASE_URL)
+    mermaid += `
     click ${txId} href "tx/${txid}"`
   if (data.inputs) {
     for (const input of data.inputs) {
@@ -54,7 +56,7 @@ export const writeMermaidFile = async info => {
     classDef txin stroke:#0f0
     classDef tx stroke:#00f`  + toMermaid(data)
   const _html = await readFile('./template.html', 'utf8')
-  const html = _html.replace('#TITLE#', title).replace('#TMPL#',mmd).replace('#BASE#', MEMPOOL_SPACE_BASE_URL)
+  const html = _html.replace('#TITLE#', title).replace('#TMPL#',mmd).replace('#BASE#', MEMPOOL_SPACE_BASE_URL || '')
   await mkdir(join('generated', 'mmd'), { recursive: true })
   await mkdir(join('generated', 'svg'), { recursive: true })
   await mkdir(join('generated', 'html'), { recursive: true })

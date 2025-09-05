@@ -15,7 +15,7 @@
     const base = document.createElement('base')
     base.target = '_blank'
     base.href = '#BASE#'
-    document.getElementsByTagName('head')[0].appendChild(base)
+    if (base.href !== window.location.href) document.getElementsByTagName('head')[0].appendChild(base)
   })()
 </script>
 </body>
