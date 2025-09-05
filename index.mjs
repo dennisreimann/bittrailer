@@ -50,7 +50,11 @@ export const buildIndex = async directoryPath => {
 }
 
 // returns cached index or builds new one
-export const getIndex = async directoryPath =>
-  await fileExists(indexFile)
+export const getIndex = async directoryPath => {
+  const index = await fileExists(indexFile)
     ? (await import(indexFile, { with: { type: 'json' } })).default
     : await buildIndex(directoryPath)
+  if (!Object.keys(index.tx || {}).length)
+    throw new Error(`No transactions found in ${directoryPath}. Please check the SPARROW_EXPORTS_PATH is defined correctly.`)
+  return index
+}

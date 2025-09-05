@@ -3,10 +3,18 @@ import { join } from 'path'
 import { getIndex } from './index.mjs'
 import { writeMermaidFile, slug } from './helpers.mjs'
 
+const { SPARROW_EXPORTS_PATH } = process.env
 const outpoint = process.argv[2]
 const title = process.argv[3] || outpoint
 const lvl = process.argv[4] || 99
-const index = await getIndex(process.env.SPARROW_EXPORTS_PATH)
+
+let index = {}
+try {
+  index = await getIndex(SPARROW_EXPORTS_PATH)
+} catch (e) {
+  console.error(e.message)
+  process.exit(1)
+}
 
 const getData = async (txid, vout, level) => {
   if (level > lvl) return console.warn('max level reached')
