@@ -1,15 +1,15 @@
 {
   "name": "bittrailer",
   "version": "1.0.0",
-  "description": "Find UTXO trails across Sparrow wallet exports",
+  "description": "Finds UTXO trails across Sparrow wallet label exports (BIP 329)",
   "main": "index.mjs",
   "author": "",
   "license": "UNLICENSED",
   "scripts": {
     "init": "npm install && mkdir -p generated/html && cp -r node_modules/mermaid/dist generated/html/mermaid && npm run index",
-    "index": "NODE_NO_WARNINGS=1 node task-index.mjs",
-    "lookup": "NODE_NO_WARNINGS=1 node task-lookup.mjs",
-    "mermaid": "NODE_NO_WARNINGS=1 node task-mermaid.mjs",
+    "index": "node task-index.mjs",
+    "lookup": "node task-lookup.mjs",
+    "mermaid": "node task-mermaid.mjs",
     "start": "serve generated/html"
   },
   "dependencies": {

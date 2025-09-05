@@ -5,7 +5,7 @@ import { writeMermaidFile, slug } from './helpers.mjs'
 
 const outpoint = process.argv[2]
 const title = process.argv[3] || outpoint
-const lvl = process.argv[4] || 13
+const lvl = process.argv[4] || 99
 const index = await getIndex(process.env.SPARROW_EXPORTS_PATH)
 
 const getData = async (txid, vout, level) => {
